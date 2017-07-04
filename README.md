@@ -2,7 +2,11 @@
 
 Nginx + [https rdns](https://github.com/flant/nginx-http-rdns) module
 
-## Example 
+## usage
+
+`docker pull quay.io/buildo/nginx-rdns`
+
+## example conf file
 ```
 server {
     listen        80;
