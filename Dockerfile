@@ -49,6 +49,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		--with-compat \
 		--with-file-aio \
 		--with-http_v2_module \
+		--add-module=/usr/src/nginx-$NGINX_VERSION/nginx-http-rdns \
 	" \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
@@ -66,7 +67,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		gd-dev \
 		geoip-dev \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
-	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc	-o nginx.tar.gz.asc \
+	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
 	&& export GNUPGHOME="$(mktemp -d)" \
 	&& found=''; \
 	for server in \
@@ -85,6 +86,12 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& tar -zxC /usr/src -f nginx.tar.gz \
 	&& rm nginx.tar.gz \
 	&& cd /usr/src/nginx-$NGINX_VERSION \
+# install nginx-http-rdns dependency
+	&& mkdir nginx-http-rdns \
+	&& cd nginx-http-rdns \
+	&& curl -O https://raw.githubusercontent.com/flant/nginx-http-rdns/master/config \
+	&& curl -O https://raw.githubusercontent.com/flant/nginx-http-rdns/master/ngx_http_rdns_module.c \
+	&& cd .. \
 	&& ./configure $CONFIG --with-debug \
 	&& make -j$(getconf _NPROCESSORS_ONLN) \
 	&& mv objs/nginx objs/nginx-debug \
@@ -108,6 +115,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& ln -s ../../usr/lib/nginx/modules /etc/nginx/modules \
 	&& strip /usr/sbin/nginx* \
 	&& strip /usr/lib/nginx/modules/*.so \
+	&& rm -rf /usr/src/nginx-$NGINX_VERSION \
 	\
 	# Bring in gettext so we can get `envsubst`, then throw
 	# the rest away. To do this, we need to install `gettext`
@@ -124,31 +132,13 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 			| sort -u \
 	)" \
 	&& apk add --no-cache --virtual .nginx-rundeps $runDeps \
+	&& apk del .build-deps \
 	&& apk del .gettext \
 	&& mv /tmp/envsubst /usr/local/bin/ \
 	\
 	# forward request and error logs to docker log collector
 	&& ln -sf /dev/stdout /var/log/nginx/access.log \
 	&& ln -sf /dev/stderr /var/log/nginx/error.log
-
-# install nginx-http-rdns dependency
-
-RUN apk add --no-cache --virtual \
-		curl \
-		gcc \
-		libc-dev \
-		linux-headers \
-	&& cd /usr/src/nginx-$NGINX_VERSION \
-	&& mkdir nginx-http-rdns \
-	&& cd nginx-http-rdns \
-	&& curl -O https://raw.githubusercontent.com/flant/nginx-http-rdns/master/config \
-	&& curl -O https://raw.githubusercontent.com/flant/nginx-http-rdns/master/ngx_http_rdns_module.c \
-	&& cd .. \
-	&& ./configure --with-compat --add-dynamic-module=./nginx-http-rdns \
-	&& make modules \
-	&& cp objs/ngx_http_rdns_module.so /etc/nginx/modules/ \
-	&& apk del .build-deps \
-	&& rm -rf /usr/src/nginx-$NGINX_VERSION
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY nginx.vh.default.conf /etc/nginx/conf.d/default.conf
